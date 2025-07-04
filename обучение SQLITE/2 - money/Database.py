@@ -48,7 +48,8 @@ class DB:
         rows = self.cur.fetchall()
         return rows
 
-
+#------------------------------------------------------------------------------
+#Класс оконного приложения(внешний вид и часть логики приложения)
 class Application:
     @staticmethod
     def copypaste(event):
@@ -62,10 +63,72 @@ class Application:
 
     def get_selected_row(self,event):
         global selected_tuple
-        if event.widget == self.list1 and len(self.list1.curselection()) != 0:
-            index = self.list1.curselection()[0]
-            selected_tuple = self.list1.get(index)
+        if event.widget == self.table and len(self.table.selection()) != 0:
+            print("Длина выбранного",len(self.table.selection()))
+            index = self.table.selection()[0]
+            selected_tuple = tuple(self.table.item(index)["values"])
             print(selected_tuple, index)
+
+
+    def __init__(self):
+
+        self.db = DB()
+
+        self.window = Tk()
+        self.window.title("Бюджет 0.1")
+        self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.columns = {
+            "Id":"Номер",
+            "name":"Название",
+            "price":"Стоимость",
+            "comment":"Комментарий",
+            "date":"Дата",
+            "category":"Категория"
+        }
+        self.categories = ["Питание", "ЖКХ", "Одежда", "Техника", "Детское", "Уход за собой"]
+
+        self.table = ttk.Treeview(self.window,columns=tuple(self.columns.keys()), show="headings")
+        self.table.grid(row=2, column=0, rowspan=6, columnspan=2, padx = 10, pady = 10)
+        for col in self.columns.keys():
+            self.table.heading(col, text=self.columns[col])
+
+        self.l1 = Label(self.window, text="Сумма")
+        self.l1.grid(row=10, column=0, pady=(10,0), padx = 10,sticky=tkinter.W)
+
+        self.sum_text = StringVar()
+        self.e_sum = Entry(self.window, textvariable=self.sum_text,)
+        self.e_sum.grid(row=11, column=0, pady=(0,10), padx = 10, sticky=tkinter.W)
+
+        self.sb1 = Scrollbar(self.window)
+        self.sb1.grid(row=2, column=2, rowspan=6)
+
+        self.table.configure(yscrollcommand=self.sb1.set)
+        self.sb1.configure(command=self.table.yview)
+
+        self.table.bind('<<TreeviewSelect>>', self.get_selected_row)
+        self.window.bind('<Control-Key>', self.copypaste)
+
+        self.b1 = Button(self.window, text="Посмотреть все", width=12, command= self.view_command)
+        self.b1.grid(row=2, column=3, padx = (0,10))  # size of the button
+
+        self.b2 = Button(self.window, text="Поиск", width=12, command= self.search_window_command)
+        self.b2.grid(row=3, column=3, padx = (0,10))
+
+        self.b3 = Button(self.window, text="Добавить", width=12, command= self.add_window_command)
+        self.b3.grid(row=4, column=3, padx = (0,10))
+
+        self.b4 = Button(self.window, text="Обновить", width=12, command= self.update_window_command)
+        self.b4.grid(row=5, column=3, padx = (0,10))
+
+        self.b5 = Button(self.window, text="Удалить", width=12, command= self.delete_command)
+        self.b5.grid(row=6, column=3, padx = (0,10))
+
+        self.b6 = Button(self.window, text="Закрыть", width=12, command=self.on_closing)
+        self.b6.grid(row=7, column=3, padx = (0,10))
+
+        self.view_command()
+
+        self.window.mainloop()
 
 
     def second_window_command(self,title):
@@ -112,23 +175,6 @@ class Application:
         self.second_window.grab_set()
 
 
-    def search_choose_command(self):
-        pass
-
-
-    def search_dialog_command(self):
-        self.search_dialog_window = tkinter.Toplevel(self.window)
-        self.search_dialog_window.focus_set()
-        self.search_dialog_window.grab_set()
-        self.lsd1 = Label(self.search_dialog_window, text="Параметры поиска")
-        self.lsd1.grid(row=1, column=0, padx=10)
-        self.search_options_text = StringVar(value=self.search_options[0])
-        self.cat_cb_box = ttk.Combobox(self.search_dialog_window, textvariable=self.search_options_text, values=list(self.search_options.keys()))
-        self.cat_cb_box.grid(row=3, column=0, padx=10, pady=(0,10))
-
-        self.bsd1 = Button(self.search_dialog_window, text="Создать запрос", width=12, command=self.search_choose_command)
-        self.bsd1.grid(row=5, column=0, padx=10, pady=(0,10))
-
     def search_window_command(self):
         self.second_window_command("Поиск")
         self.bs1 = Button(self.second_window, text="Поиск", width=12, command=self.search_command)
@@ -136,11 +182,13 @@ class Application:
 
 
     def update_window_command(self):
-        if selected_tuple == None:
+        if self.table.selection() == None:
+
             messagebox.showinfo("Предупреждение", message="Выберите строку базы для обновления")
             self.window.grab_set()
             self.window.wait_window()
         else:
+            print("Выбрано",selected_tuple)
             self.window.grab_release()
             self.second_window_command("Обновить")
             self.es1.insert(0,selected_tuple[1])
@@ -165,25 +213,29 @@ class Application:
         self.window.grab_release()
 
 
-    def del_search_dialog_window(self):
-        self.search_dialog_window.destroy()
-        del self.search_dialog_window
-        self.window.grab_release()
-
-
     def view_command(self):
-        self.list1.delete(0, END)
+        self.sum = 0
+        for i in self.table.get_children():
+            self.table.delete(i)
+
         for row in self.db.view():
-            self.list1.insert(END, row)
+            self.table.insert('','end', values = row)
+            self.sum += int(row[2])
+
+        self.sum_text.set(str(self.sum))
 
 
     def search_command(self):
-        self.list1.delete(0, END)
+        for i in self.table.get_children():
+            self.table.delete(i)
+        self.sum = 0
         for row in self.db.search(self.product_text.get(),
                                   self.price_text.get(),
                                   self.comment_text.get(),
                                   self.date_text.get(),self.cat_text.get()):
-            self.list1.insert(END, row)
+            self.table.insert('','end', values = row)
+            self.sum +=int(row[2])
+        self.sum_text.set(str(self.sum))
         self.del_second_window()
 
 
@@ -212,6 +264,7 @@ class Application:
                        self.comment_text.get(),
                        self.date_text.get(),
                        self.cat_text.get())
+        selected_tuple == None
         self.del_second_window()
         self.view_command()
 
@@ -220,58 +273,6 @@ class Application:
         if messagebox.askokcancel("", "Закрыть программу?"):
             self.window.destroy()
 
-
-    def __init__(self):
-
-        self.db = DB()
-
-        self.window = Tk()
-        self.window.title("Бюджет 0.1")
-        self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
-
-        self.list1 = Listbox(self.window, height=25, width=65)
-        self.list1.grid(row=2, column=0, rowspan=6, columnspan=2, padx = 10, pady = 10)
-
-        self.sb1 = Scrollbar(self.window)
-        self.sb1.grid(row=2, column=2, rowspan=6)
-
-        self.list1.configure(yscrollcommand=self.sb1.set)
-        self.sb1.configure(command=self.list1.yview)
-
-        self.list1.bind('<<ListboxSelect>>', self.get_selected_row)
-        self.window.bind('<Control-Key>', self.copypaste)
-
-        self.b1 = Button(self.window, text="Посмотреть все", width=12, command= self.view_command)
-        self.b1.grid(row=2, column=3, padx = (0,10))  # size of the button
-
-        self.b2 = Button(self.window, text="Поиск", width=12, command= self.search_window_command)
-        self.b2.grid(row=3, column=3, padx = (0,10))
-
-        self.b3 = Button(self.window, text="Добавить", width=12, command= self.add_window_command)
-        self.b3.grid(row=4, column=3, padx = (0,10))
-
-        self.b4 = Button(self.window, text="Обновить", width=12, command= self.update_window_command)
-        self.b4.grid(row=5, column=3, padx = (0,10))
-
-        self.b5 = Button(self.window, text="Удалить", width=12, command= self.delete_command)
-        self.b5.grid(row=6, column=3, padx = (0,10))
-
-        self.b6 = Button(self.window, text="Закрыть", width=12, command=self.on_closing)
-        self.b6.grid(row=7, column=3, padx = (0,10))
-
-        self.categories = ["Питание", "ЖКХ", "Одежда", "Техника", "Детское", "Уход за собой"]
-        self.search_options = {
-        'Общий':self.search_command,
-        'Название':self.search_command,
-        'Цена':self.search_command,
-        'Комментарий':self.search_command,
-        'Дата':self.search_command,
-        'Категория':self.search_command
-        }
-
-        self.view_command()
-
-        self.window.mainloop()
 
 if __name__ == '__main__':
     app = Application()
