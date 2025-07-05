@@ -17,25 +17,28 @@ class DB:
     def __del__(self):
         self.conn.close()
 
-
+#вывод базы на экран
     def view(self):
         self.cur.execute("SELECT * FROM buy")
         rows = self.cur.fetchall()
         return rows
 
+#вставка нового значения
     def insert(self, product, price, comment, date, category):
         self.cur.execute("INSERT INTO buy VALUES (NULL,?,?,?,?,?)", (product, price, comment, date, category))
         self.conn.commit()
 
+#обновление значений атрибутов сущности/строки базы
     def update(self, id, product, price, comment, date, category):
         self.cur.execute("UPDATE buy SET product=?, price=?, comment=?, date=?, category=? WHERE id=?", (product, price, comment, date, category, id,))
         self.conn.commit()
 
+#удаление одной сущности/строки
     def delete(self, id):
         self.cur.execute("DELETE FROM buy WHERE id=?", (id,))
         self.conn.commit()
 
-
+#поиск по базе
     def search(self, product = "", price = "", comment = "", date = "", category = ""):
         self.cur.execute("""SELECT * FROM buy 
                                 WHERE product=? 
@@ -51,6 +54,8 @@ class DB:
 #------------------------------------------------------------------------------
 #Класс оконного приложения(внешний вид и часть логики приложения)
 class Application:
+
+#копирование и вставка значений в русской раскладке
     @staticmethod
     def copypaste(event):
         if event.keycode == 86 and event.keysym != 'v':
@@ -60,7 +65,7 @@ class Application:
         elif event.keycode == 88 and event.keysym != 'x':
             event.widget.event_generate('<<Cut>>')
 
-
+# сохранение данных выбранной строки
     def get_selected_row(self,event):
         global selected_tuple
         if event.widget == self.table and len(self.table.selection()) != 0:
@@ -69,7 +74,7 @@ class Application:
             selected_tuple = tuple(self.table.item(index)["values"])
             print(selected_tuple, index)
 
-
+#при инициализации объекта приложения происходит создание объекта соединения с БД,  а также создание и заполнение окна по сетке
     def __init__(self):
 
         self.db = DB()
@@ -130,7 +135,7 @@ class Application:
 
         self.window.mainloop()
 
-
+#окно для поиска,ообновления, добавления
     def second_window_command(self,title):
         self.second_window = tkinter.Toplevel(self.window)
         self.second_window.title =  "Бюджет 0.1: "+ title
